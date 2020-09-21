@@ -167,6 +167,7 @@ func fetchDisplays() ([]display, error) {
 	return displays, nil
 }
 
+const dconfPlankOffset = "/net/launchpad/plank/docks/dock1/offset"
 const dconfPlank = "/net/launchpad/plank/docks/dock1/monitor"
 
 func movePlankTo(d display) error {
@@ -186,16 +187,25 @@ func movePlankTo(d display) error {
 		return nil
 	}
 
-	err = exec.Command("dconf", "write", dconfPlank, value).
-		Run()
-
-	if err == nil {
-		fmt.Printf("attempting to move plank to %s\n", d.name)
-		_ = exec.Command("killall", "plank").Run()
-		return exec.Command("plank").Start()
-	} else {
-		return err
+	var buf bytes.Buffer
+	fmt.Fprint(&buf, "attempting to move plank to "+d.name)
+	if d.primary {
+		fmt.Fprintf(&buf, " - primary")
 	}
+	log.Println(buf.String())
+	cmdOffset := exec.Command("dconf", "read", dconfPlankOffset)
+	offsOut, offsErr := cmdOffset.Output()
+	if offsErr != nil {
+		return offsErr
+	}
+	exec.Command("dconf", "write", dconfPlank, value).
+		Run()
+	if strings.TrimSpace(string(offsOut)) == "0" {
+		return exec.Command("dconf", "write", dconfPlankOffset, "1").
+		Run()
+	}
+	return exec.Command("dconf", "write", dconfPlankOffset, "0").
+		Run()
 
 }
 
